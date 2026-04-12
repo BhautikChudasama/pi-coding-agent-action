@@ -89,12 +89,15 @@ export class ActionOrchestrator {
           .filter(Boolean)
       : undefined;
 
+    const baseUrl = this.core.getInput('base_url') || undefined;
+
     return {
       provider: this.core.getInput('provider'),
       model: this.core.getInput('model'),
       token: this.core.getInput('token'),
       thinkingLevel: this.core.getInput('thinking_level') ?? 'off',
       promptInput: this.core.getInput('prompt'),
+      ...(baseUrl ? { baseUrl } : {}),
       ...(extensions?.length ? { extensions } : {}),
     };
   }

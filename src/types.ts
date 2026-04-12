@@ -95,6 +95,7 @@ export interface PiConfig {
   token: string;
   thinkingLevel: string;
   promptInput: string;
+  baseUrl?: string;
   extensions?: string[];
 }
 

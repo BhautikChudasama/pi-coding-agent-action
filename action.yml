@@ -21,6 +21,10 @@ inputs:
     description: 'API token for the LLM provider'
     required: true
 
+  base_url:
+    description: 'Custom base URL for the LLM provider API endpoint (e.g. https://proxy.example.com)'
+    required: false
+
   thinking_level:
     description: 'Thinking level (e.g. off, low, medium, high)'
     required: false

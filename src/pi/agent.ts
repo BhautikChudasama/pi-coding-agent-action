@@ -46,6 +46,7 @@ export class Agent {
    *                      (default `'off'`).
    * @param core       - The CoreAdapter for logging and debug output.
    * @param extensions - Optional array of extension sources (npm, git, or local paths).
+   * @param baseUrl    - Optional custom base URL for the provider API endpoint.
    * @throws {Error}   If the requested model cannot be found in the registry.
    */
   constructor(
@@ -54,7 +55,8 @@ export class Agent {
     token: string,
     level = 'off',
     core: CoreAdapter,
-    extensions?: string[]
+    extensions?: string[],
+    baseUrl?: string
   ) {
     this.modelStr = modelStr;
     this.provider = provider;
@@ -78,6 +80,10 @@ export class Agent {
 
     if (foundModel) {
       this.model = foundModel;
+      if (baseUrl) {
+        this.core.debug(`[model] Overriding baseUrl to ${baseUrl}`);
+        this.model = { ...this.model, baseUrl };
+      }
     } else {
       throw new Error('Model not found: ' + this.provider + '/' + this.modelStr);
     }
