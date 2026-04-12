@@ -12,7 +12,9 @@ Inspired by OpenCode's [GitHub action](https://opencode.ai/docs/github/).
 - **PR assistance**: Type `/pi` in a PR comment to have the agent review and improve the pull request
 - **Code reviews**: Have Pi review every new pull request automatically
 - **Automated commits**: The agent can make changes, commit them, and create PRs automatically
-- **Flexible LLM support**: Support for various providers (Anthropic, OpenAI, Google, etc.)
+- **Flexible LLM support**: Support for various providers (Anthropic, OpenAI, Google, OpenRouter, etc.)
+- **Custom provider URL**: Point the agent at a custom API endpoint, proxy, or gateway via `base_url`
+- **Budget limits**: Set `max_cost` and `max_turns` to prevent runaway sessions
 
 ## Securing your workflows
 
@@ -113,15 +115,49 @@ Create a workflow file, e.g., `.github/workflows/pi-agent.yml`. See the [interac
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `github_token` | GitHub token for API access | Yes | - |
-| `provider` | LLM provider (anthropic, openai, google, etc.) | Yes | - |
+| `provider` | LLM provider (anthropic, openai, google, openrouter, etc.) | Yes | - |
 | `model` | Model to use (e.g., claude-sonnet-4-5, gpt-4o, gemini-2.5-pro) | Yes | - |
 | `token` | Provider API token | Yes | - |
-| `thinking_level` | Model thinking level (off|low|medium|high) | No | off |
+| `base_url` | Custom base URL for the LLM provider API endpoint (e.g., a proxy or self-hosted endpoint) | No | - |
+| `thinking_level` | Model thinking level (off\|low\|medium\|high) | No | off |
+| `max_cost` | Maximum cost in USD before aborting the session (e.g., `1.00`) | No | - |
+| `max_turns` | Maximum number of LLM turns before aborting the session | No | - |
 | `trigger` | Trigger phrase used to invoke the action | No | /pi |
 | `prompt` | Optional prompt to send to the agent (skips comment extraction) | No | - |
 | `extensions` | Custom Pi extensions to load (one per line). Supports npm packages (npm:package-name), git repos (git:github.com/user/repo), or local file paths | No | - |
 
 Refer to [Pi documentation](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) for the current list of supported providers / models / etc.
+
+### Custom Provider URL
+
+Use `base_url` to point the agent at a custom API endpoint (e.g., a proxy, gateway, or self-hosted LLM). The provider and model must still match a known entry in Pi's model registry — the `base_url` overrides where the request is sent.
+
+```yaml
+      - name: Run Pi agent with custom endpoint
+        uses: shaftoe/pi-coding-agent-action@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          provider: openrouter
+          model: anthropic/claude-opus-4.6
+          token: ${{ secrets.API_KEY }}
+          base_url: https://my-proxy.example.com/v1
+```
+
+### Budget Limits
+
+Use `max_cost` and/or `max_turns` to prevent runaway sessions. The agent will be aborted when either limit is reached.
+
+```yaml
+      - name: Run Pi agent with budget limits
+        uses: shaftoe/pi-coding-agent-action@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          provider: anthropic
+          model: claude-sonnet-4-5
+          token: ${{ secrets.ANTHROPIC_API_KEY }}
+          max_cost: '2.00'   # abort if cost exceeds $2
+          max_turns: '15'    # abort after 15 LLM turns
+```
 
 ## How It Works
 
@@ -155,6 +191,7 @@ src/
 ├── pi/                        # Pi integration layer
 │   ├── index.ts               # Barrel export for pi module
 │   ├── agent.ts               # Pi SDK wrapper for session management (Agent class)
+│   ├── budget-guard.ts        # Budget guard extension (cost/turn limits)
 │   ├── prompt.ts              # System prompt and tool prompt definitions
 │   ├── logging.ts             # Centralized logging via SDK events
 │   ├── resource-loader.ts     # Resource loader configuration

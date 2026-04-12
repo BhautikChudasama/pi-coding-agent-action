@@ -96,6 +96,8 @@ export interface PiConfig {
   thinkingLevel: string;
   promptInput: string;
   baseUrl?: string;
+  maxCost?: number;
+  maxTurns?: number;
   extensions?: string[];
 }
 

@@ -10,6 +10,7 @@ import { AuthStorage, createAgentSession, ModelRegistry } from '@mariozechner/pi
 import { getResourceLoader } from './resource-loader';
 import { getVersion } from './logging';
 
+import type { BudgetLimits } from './budget-guard';
 import type { AgentSession } from '@mariozechner/pi-coding-agent';
 import type { Api, Model } from '@mariozechner/pi-ai';
 import type { ThinkingLevel } from '@mariozechner/pi-agent-core';
@@ -33,6 +34,7 @@ export class Agent {
   private outputChunks: string[] = [];
   private core: CoreAdapter;
   private extensions?: string[];
+  private budgetLimits?: BudgetLimits;
 
   /**
    * Create a new Pi agent.
@@ -47,6 +49,7 @@ export class Agent {
    * @param core       - The CoreAdapter for logging and debug output.
    * @param extensions - Optional array of extension sources (npm, git, or local paths).
    * @param baseUrl    - Optional custom base URL for the provider API endpoint.
+   * @param budgetLimits - Optional cost/turn limits for the session.
    * @throws {Error}   If the requested model cannot be found in the registry.
    */
   constructor(
@@ -56,7 +59,8 @@ export class Agent {
     level = 'off',
     core: CoreAdapter,
     extensions?: string[],
-    baseUrl?: string
+    baseUrl?: string,
+    budgetLimits?: BudgetLimits
   ) {
     this.modelStr = modelStr;
     this.provider = provider;
@@ -65,6 +69,9 @@ export class Agent {
     this.core = core;
     if (extensions !== undefined) {
       this.extensions = extensions;
+    }
+    if (budgetLimits) {
+      this.budgetLimits = budgetLimits;
     }
     this.modelRegistry = ModelRegistry.inMemory(this.authStorage);
 
@@ -103,7 +110,7 @@ export class Agent {
       thinkingLevel: this.thinkingLevel,
       authStorage: this.authStorage,
       modelRegistry: this.modelRegistry,
-      resourceLoader: await getResourceLoader(this.core, this.extensions),
+      resourceLoader: await getResourceLoader(this.core, this.extensions, this.budgetLimits),
     });
     this.session = session;
 

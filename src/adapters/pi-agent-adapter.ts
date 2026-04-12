@@ -18,7 +18,10 @@ export const createRealPiAgent: PiAgentFactory = (config: PiConfig, core): PiAge
     config.thinkingLevel,
     core,
     config.extensions,
-    config.baseUrl
+    config.baseUrl,
+    config.maxCost || config.maxTurns
+      ? { ...(config.maxCost ? { maxCost: config.maxCost } : {}), ...(config.maxTurns ? { maxTurns: config.maxTurns } : {}) }
+      : undefined
   );
 
   return {

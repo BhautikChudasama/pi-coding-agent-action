@@ -39,6 +39,14 @@ inputs:
     required: false
     default: '/pi'
 
+  max_cost:
+    description: 'Maximum cost in USD before aborting the session (e.g. 1.00)'
+    required: false
+
+  max_turns:
+    description: 'Maximum number of LLM turns before aborting the session'
+    required: false
+
   extensions:
     description: 'Custom Pi extensions to load (one per line). Supports npm packages (npm:package-name), git repos (git:github.com/user/repo), or local file paths.'
     required: false

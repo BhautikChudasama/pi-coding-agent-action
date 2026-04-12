@@ -90,6 +90,10 @@ export class ActionOrchestrator {
       : undefined;
 
     const baseUrl = this.core.getInput('base_url') || undefined;
+    const maxCostStr = this.core.getInput('max_cost');
+    const maxTurnsStr = this.core.getInput('max_turns');
+    const maxCost = maxCostStr ? parseFloat(maxCostStr) : undefined;
+    const maxTurns = maxTurnsStr ? parseInt(maxTurnsStr, 10) : undefined;
 
     return {
       provider: this.core.getInput('provider'),
@@ -98,6 +102,8 @@ export class ActionOrchestrator {
       thinkingLevel: this.core.getInput('thinking_level') ?? 'off',
       promptInput: this.core.getInput('prompt'),
       ...(baseUrl ? { baseUrl } : {}),
+      ...(maxCost && !isNaN(maxCost) ? { maxCost } : {}),
+      ...(maxTurns && !isNaN(maxTurns) ? { maxTurns } : {}),
       ...(extensions?.length ? { extensions } : {}),
     };
   }

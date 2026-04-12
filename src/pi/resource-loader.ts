@@ -18,6 +18,7 @@ import {
 import { SYSTEM_PROMPT } from './prompt';
 import { createLoggingFactory } from './logging';
 import type { ExtensionLoadingInfo } from './logging';
+import { createBudgetGuardFactory, type BudgetLimits } from './budget-guard';
 import { extensionsFactory } from './tools/index';
 import type { CoreAdapter } from '../types';
 
@@ -84,13 +85,19 @@ export async function resolveExtensions(extensions?: string[]): Promise<Extensio
  */
 export async function getResourceLoader(
   core: CoreAdapter,
-  extensions?: string[]
+  extensions?: string[],
+  budgetLimits?: BudgetLimits
 ): Promise<DefaultResourceLoader> {
   const { paths: additionalExtensionPaths, info: extensionInfo } =
     await resolveExtensions(extensions);
 
+  const extensionFactories = [extensionsFactory, createLoggingFactory(core, extensionInfo)];
+  if (budgetLimits?.maxCost || budgetLimits?.maxTurns) {
+    extensionFactories.push(createBudgetGuardFactory(core, budgetLimits));
+  }
+
   const loader = new DefaultResourceLoader({
-    extensionFactories: [extensionsFactory, createLoggingFactory(core, extensionInfo)],
+    extensionFactories,
     additionalExtensionPaths,
     systemPromptOverride: () => SYSTEM_PROMPT,
     appendSystemPromptOverride: agentsFiles => {
