@@ -33,11 +33,15 @@ export const loggingFactory = (
 ) => {
   pi.on('tool_execution_start', async event => {
     core.info('');
-    core.debug(`🔧 Tool Execution started: ${event.toolName} (${event.toolCallId})`);
+    core.info(`::group::🔧 Tool Execution: ${event.toolName}`);
+    core.info(`  Tool Call ID: ${event.toolCallId}`);
+    core.info(`  📥 Input:`);
+    core.info(truncateText(JSON.stringify(event.args, null, 2), 2000));
+    core.info('::endgroup::');
   });
 
   pi.on('tool_execution_end', async event => {
-    core.info(`::group::🔧 Tool Execution: ${event.toolName}`);
+    core.info(`::group::🔧 Tool Result: ${event.toolName}`);
     core.info(`  Tool Call ID: ${event.toolCallId}`);
 
     // Check for cancellation via details.cancelled pattern
@@ -50,6 +54,8 @@ export const loggingFactory = (
     } else {
       core.info(`  ✅ execution succeeded`);
     }
+    core.info(`  📤 Output:`);
+    core.info(truncateText(JSON.stringify(event.result, null, 2), 3000));
     core.info('::endgroup::');
   });
 
