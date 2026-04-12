@@ -1,6 +1,5 @@
 # Pi Coding Agent GitHub Action
 
-[![Codecov](https://codecov.io/gh/shaftoe/pi-coding-agent-action/branch/v2/graph/badge.svg)](https://app.codecov.io/gh/shaftoe/pi-coding-agent-action/)
 
 This is a GitHub action that integrates [Pi coding agent](https://pi.dev) with GitHub workflows (issues, pull requests, etc.).
 
@@ -57,7 +56,7 @@ jobs:
           node-version: 24
 
       - name: Run Pi agent
-        uses: shaftoe/pi-coding-agent-action@v2
+        uses: BhautikChudasama/pi-coding-agent-action@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: my-provider
@@ -72,7 +71,7 @@ You can use the `prompt` input to run the agent without requiring a comment trig
 
 ```yaml
       - name: Run Pi agent with fixed prompt
-        uses: shaftoe/pi-coding-agent-action@v2
+        uses: BhautikChudasama/pi-coding-agent-action@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: anthropic
@@ -89,7 +88,7 @@ You can load custom Pi extensions to add additional tools, custom tools, or modi
 
 ```yaml
       - name: Run Pi agent with extensions
-        uses: shaftoe/pi-coding-agent-action@v2
+        uses: BhautikChudasama/pi-coding-agent-action@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: anthropic
@@ -134,7 +133,7 @@ Use `base_url` to point the agent at a custom API endpoint (e.g., a proxy, gatew
 
 ```yaml
       - name: Run Pi agent with custom endpoint
-        uses: shaftoe/pi-coding-agent-action@v2
+        uses: BhautikChudasama/pi-coding-agent-action@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: openrouter
@@ -149,7 +148,7 @@ Use `max_cost` and/or `max_turns` to prevent runaway sessions. The agent will be
 
 ```yaml
       - name: Run Pi agent with budget limits
-        uses: shaftoe/pi-coding-agent-action@v2
+        uses: BhautikChudasama/pi-coding-agent-action@v2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           provider: anthropic
