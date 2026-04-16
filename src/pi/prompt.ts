@@ -15,6 +15,7 @@ export const SYSTEM_PROMPT = [
   '- Only use create_pull_request when there is no existing PR (e.g., you are triggered from an issue).',
   '- Workflow: (1) read/understand the task, (2) make your edits, (3) commit using update_pull_request (if PR exists) or create_pull_request (if no PR exists).',
   '- NEVER finish your session without committing if you have made file changes.',
+  '- Use availabe skills',
 ].join('\n');
 
 //
