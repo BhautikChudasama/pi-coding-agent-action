@@ -2,22 +2,29 @@
  * @file GitHub pull request update tool implementation.
  *
  * Implements the server-side logic for the `update_pull_request` custom tool:
- * detecting changed files in the working tree, creating blobs/trees/commits
- * via the Git Data API, and pushing the new commit to an existing PR branch.
- * Supports updating the PR title and body as well. Supports dry-run mode for
- * testing without side effects.
+ * detecting changed files in the working tree, committing via local git
+ * commands, and pushing to an existing PR branch. Supports updating the PR
+ * title and body as well. Supports dry-run mode for testing without side effects.
  */
 
 import * as github from '@actions/github';
 import { getOctokit } from './octokit';
+import { getCoreAdapter } from './index';
 import { MAX_TITLE_LENGTH } from './constants';
+import { createLogger } from './git/index';
 import {
-  createLogger,
-  scanForChanges,
-  createBlobsAndTree,
-  createCommitAndUpdateBranch,
-  buildFileMap,
-} from './git/index';
+  configureGitUser,
+  configureGitAuth,
+  hasLocalChanges,
+  getChangesSummary,
+  stageAllChanges,
+  commitChanges,
+  pushToRemote,
+  fetchBranch,
+  checkoutBranch,
+  stashChanges,
+  stashPop,
+} from './git/local-git';
 
 const log = createLogger();
 
@@ -121,16 +128,15 @@ export function validateUpdatePullRequestParams(params: UpdatePullRequestParams)
 /**
  * Update a pull request end-to-end.
  *
- * Orchestrates the full flow: fetches the PR and its branch, scans for changed
- * files, creates a commit on the PR branch, and optionally updates the PR's
- * title and/or body. When `dryRun` is `true` the operation is simulated and no
- * GitHub resources are modified.
+ * Orchestrates the full flow: fetches the PR and its branch, detects local
+ * changes, commits via local git, pushes to the PR branch, and optionally
+ * updates the PR's title and/or body. When `dryRun` is `true` the operation
+ * is simulated and no changes are made.
  *
  * @param params - Parameters controlling PR number, title, body, and dry-run.
  * @returns The tool result containing a human-readable message and structured
  *          details about the updated PR (or dry-run output).
- * @throws {Error} If no changes are detected, the PR is not found, or the
- *                 GitHub API call fails.
+ * @throws {Error} If the PR is not found or the operation fails.
  */
 export async function updatePullRequest(
   params: UpdatePullRequestParams
@@ -154,7 +160,7 @@ export async function updatePullRequest(
   log.debug(`Body: ${body ? '(provided)' : '(no change)'}`);
   log.debug(`DryRun: ${dryRun ?? false}`);
 
-  // Fetch PR details
+  // Fetch PR details (still needed for branch names and URL)
   const octokit = getOctokit();
   const owner = github.context.repo.owner;
   const repo = github.context.repo.repo;
@@ -176,21 +182,14 @@ export async function updatePullRequest(
 
   const headBranch = prData.data.head.ref;
   const baseBranch = prData.data.base.ref;
-  const headSha = prData.data.head.sha;
   const prUrl = prData.data.html_url;
 
   log.debug(`PR found: ${prUrl}`);
   log.debug(`Head branch: ${headBranch}`);
   log.debug(`Base branch: ${baseBranch}`);
-  log.debug(`Head SHA: ${headSha}`);
 
-  // Get files that exist in the current PR head tree (for comparison)
-  log.debug(`Getting PR head tree...`);
-  const headFiles = await buildFileMap(headSha);
-  log.debug(`Found ${headFiles.size} files in PR head`);
-
-  // Scan for changes (do this before dry run check so dry run can report them)
-  const { changedFiles, deletedFiles } = await scanForChanges(headFiles, log);
+  // Check for local changes
+  const changes = hasLocalChanges(log);
 
   // Dry run mode - report what would happen without making changes
   if (dryRun) {
@@ -203,23 +202,27 @@ export async function updatePullRequest(
     }
     parts.push(`- Head branch: ${headBranch}`);
     parts.push(`- Base branch: ${baseBranch}`);
-    if (changedFiles.length > 0 || deletedFiles.length > 0) {
+    if (changes) {
+      const summary = getChangesSummary(log);
       parts.push(`- Code changes:`);
-      if (changedFiles.length > 0) {
-        parts.push(`  - ${changedFiles.length} modified/new file(s)`);
+      if (summary.added > 0) {
+        parts.push(`  - ${summary.added} new file(s)`);
       }
-      if (deletedFiles.length > 0) {
-        parts.push(`  - ${deletedFiles.length} deleted file(s)`);
+      if (summary.modified > 0) {
+        parts.push(`  - ${summary.modified} modified file(s)`);
+      }
+      if (summary.deleted > 0) {
+        parts.push(`  - ${summary.deleted} deleted file(s)`);
       }
     } else {
       parts.push(`- No code changes detected`);
     }
 
-    const message = parts.join('\n');
-    log.debug(message);
+    const dryRunMessage = parts.join('\n');
+    log.debug(dryRunMessage);
 
     return {
-      content: [{ type: 'text' as const, text: message }],
+      content: [{ type: 'text' as const, text: dryRunMessage }],
       details: {
         pullRequestNumber: resolvedPullNumber,
         pullRequestUrl: prUrl,
@@ -231,37 +234,36 @@ export async function updatePullRequest(
   }
 
   let commitSha: string | undefined;
-  if (changedFiles.length > 0 || deletedFiles.length > 0) {
-    // Create blobs and tree
-    const treeSha = await createBlobsAndTree({
-      changedFiles,
-      deletedFiles,
-      parentSha: headSha,
-      log,
-    });
+  if (changes) {
+    // Configure git for commit and push
+    const token = getCoreAdapter().getInput('github_token');
+    configureGitUser(log);
+    configureGitAuth(token, log);
+
+    // Stash changes, checkout PR branch, pop stash, commit, push
+    stashChanges(log);
+    fetchBranch(headBranch, log);
+    checkoutBranch(headBranch, log);
+    stashPop(log);
 
     // Generate commit message
     let commitMessage = message;
     if (!commitMessage) {
-      // Generate a descriptive commit message based on the changes
-      const changes: string[] = [];
-      if (changedFiles.length > 0) {
-        changes.push(`${changedFiles.length} modified/new file(s)`);
+      const summary = getChangesSummary(log);
+      const changeParts: string[] = [];
+      if (summary.added + summary.modified > 0) {
+        changeParts.push(`${summary.added + summary.modified} modified/new file(s)`);
       }
-      if (deletedFiles.length > 0) {
-        changes.push(`${deletedFiles.length} deleted file(s)`);
+      if (summary.deleted > 0) {
+        changeParts.push(`${summary.deleted} deleted file(s)`);
       }
-      commitMessage = `Update PR #${resolvedPullNumber}: ${changes.join(', ')}`;
+      commitMessage = `Update PR #${resolvedPullNumber}: ${changeParts.join(', ')}`;
     }
 
-    // Create commit and update branch
-    commitSha = await createCommitAndUpdateBranch({
-      treeSha,
-      parentSha: headSha,
-      branchName: headBranch,
-      message: commitMessage,
-      log,
-    });
+    stageAllChanges(log);
+    commitSha = commitChanges(commitMessage, log);
+    pushToRemote(headBranch, false, log);
+
     log.info(`Created new commit ${commitSha} on branch ${headBranch}`);
   } else {
     log.info(`No code changes detected, only updating PR metadata if provided`);

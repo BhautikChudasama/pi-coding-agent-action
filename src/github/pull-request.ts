@@ -2,23 +2,27 @@
  * @file GitHub pull request creation tool implementation.
  *
  * Implements the server-side logic for the `create_pull_request` custom tool:
- * detecting changed files in the working tree, creating blobs/trees/commits
- * via the Git Data API, creating a new branch, and opening a pull request.
+ * detecting changed files in the working tree, committing via local git
+ * commands, creating a new branch, pushing, and opening a pull request.
  * Supports dry-run mode for testing without side effects.
  */
 
 import * as github from '@actions/github';
 import { Temporal } from '@js-temporal/polyfill';
 import { getOctokit } from './octokit';
+import { getCoreAdapter } from './index';
 import { BRANCH_PREFIX, MAX_TITLE_LENGTH } from './constants';
 import { getContextType } from './context-utils';
+import { createLogger } from './git/index';
 import {
-  createLogger,
-  scanForChanges,
-  createBlobsAndTree,
-  createCommitAndUpdateBranch,
-  buildFileMap,
-} from './git/index';
+  configureGitUser,
+  configureGitAuth,
+  hasLocalChanges,
+  stageAllChanges,
+  commitChanges,
+  pushToRemote,
+  createAndCheckoutBranch,
+} from './git/local-git';
 
 const log = createLogger();
 
@@ -169,9 +173,10 @@ async function createPullRequestOnGitHub(
 /**
  * Create a pull request end-to-end.
  *
- * Orchestrates the full flow: determines the base branch, scans for changed
- * files, creates a branch, commits, and opens the PR. When `dryRun` is `true`
- * the operation is simulated and no GitHub resources are created.
+ * Orchestrates the full flow: determines the base branch, detects local
+ * changes, creates a branch, commits via local git, pushes, and opens the PR.
+ * When `dryRun` is `true` the operation is simulated and no GitHub resources
+ * are created.
  *
  * @param params - Parameters controlling title, body, base branch, and dry-run.
  * @returns The tool result containing a human-readable message and structured
@@ -219,66 +224,26 @@ export async function createPullRequest(
     };
   }
 
-  // Create and push the new branch via GitHub API
-  log.debug(`Preparing branch and changes via GitHub API...`);
+  // Check for local changes before creating branch
+  if (!hasLocalChanges(log)) {
+    throw new Error(
+      '[pull-request] Failed to create pull request: No changes detected. Please add new files and/or make your changes before creating a pull request.'
+    );
+  }
 
   try {
-    const octokit = getOctokit();
-    const owner = github.context.repo.owner;
-    const repo = github.context.repo.repo;
+    // Configure git for commit and push
+    const token = getCoreAdapter().getInput('github_token');
+    configureGitUser(log);
+    configureGitAuth(token, log);
 
-    // Get base branch reference
-    log.debug(`Getting base branch "${baseBranch}" reference...`);
-    const baseRef = await octokit.rest.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${baseBranch}`,
-    });
-    const baseSha = baseRef.data.object.sha;
-    log.debug(`Base branch SHA: ${baseSha}`);
+    // Create new branch, stage, commit, push
+    createAndCheckoutBranch(head, log);
+    stageAllChanges(log);
+    commitChanges(title, log);
+    pushToRemote(head, true, log);
 
-    // Get files that exist in the base branch tree (for comparison)
-    log.debug(`Getting base branch tree...`);
-    const baseFiles = await buildFileMap(baseSha);
-    log.debug(`Found ${baseFiles.size} files in base branch`);
-
-    // Scan for changes
-    const { changedFiles, deletedFiles } = await scanForChanges(baseFiles, log);
-
-    if (changedFiles.length === 0 && deletedFiles.length === 0) {
-      const errorMsg =
-        'No changes detected. Please add new files and/or make your changes before creating a pull request.';
-      throw new Error(errorMsg);
-    }
-
-    // Create new branch reference from base branch
-    log.debug(`Creating new branch "${head}"...`);
-    await octokit.rest.git.createRef({
-      owner,
-      repo,
-      ref: `refs/heads/${head}`,
-      sha: baseSha,
-    });
-    log.debug(`Branch created successfully`);
-
-    // Create blobs and tree
-    const treeSha = await createBlobsAndTree({
-      changedFiles,
-      deletedFiles,
-      parentSha: baseSha,
-      log,
-    });
-
-    // Create commit and update branch
-    await createCommitAndUpdateBranch({
-      treeSha,
-      parentSha: baseSha,
-      branchName: head,
-      message: title,
-      log,
-    });
-
-    // Create pull request
+    // Create pull request via API
     const prResult = await createPullRequestOnGitHub(title, bodyText, baseBranch, head);
 
     const successMessage = `Pull request #${prResult.number} created: ${prResult.url}`;

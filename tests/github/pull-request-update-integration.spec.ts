@@ -59,51 +59,43 @@ const mockPullsGet = mock(() =>
     },
   })
 );
-const mockGetTree = mock(() =>
-  Promise.resolve({
-    data: {
-      sha: 'tree-sha-123',
-      tree: [],
-    },
-  })
-);
-const mockCreateBlob = mock(() =>
-  Promise.resolve({
-    data: { sha: 'blob-sha-123' },
-  })
-);
-const mockCreateTree = mock(() =>
-  Promise.resolve({
-    data: { sha: 'new-tree-sha' },
-  })
-);
-const mockCreateCommit = mock(() =>
-  Promise.resolve({
-    data: { sha: 'commit-sha-123' },
-  })
-);
-const mockUpdateRef = mock(() =>
-  Promise.resolve({
-    data: { ref: 'refs/heads/feature-branch' },
-  })
-);
 const mockOctokit = {
   rest: {
     pulls: {
       get: mockPullsGet,
       update: mockPullsUpdate,
     },
-    git: {
-      getTree: mockGetTree,
-      createBlob: mockCreateBlob,
-      createTree: mockCreateTree,
-      createCommit: mockCreateCommit,
-      updateRef: mockUpdateRef,
-    },
   },
 };
 mock.module('../../src/github/octokit', () => ({
   getOctokit: mock(() => mockOctokit),
+}));
+
+// Mock local git operations
+const mockHasLocalChanges = mock((_log?: any) => false as boolean);
+const mockGetChangesSummary = mock((_log?: any) => ({ added: 0, modified: 0, deleted: 0, files: [] as string[] }));
+const mockConfigureGitUser = mock(noop);
+const mockConfigureGitAuth = mock((_token: string, _log?: any) => {});
+const mockStageAllChanges = mock(noop);
+const mockCommitChanges = mock((_msg: string, _log?: any) => 'commit-sha-123');
+const mockPushToRemote = mock((_branch: string, _upstream: boolean, _log?: any) => {});
+const mockFetchBranch = mock((_branch: string, _log?: any) => {});
+const mockCheckoutBranch = mock((_branch: string, _log?: any) => {});
+const mockStashChanges = mock((_log?: any) => true as boolean);
+const mockStashPop = mock(noop);
+
+mock.module('../../src/github/git/local-git', () => ({
+  hasLocalChanges: mockHasLocalChanges,
+  getChangesSummary: mockGetChangesSummary,
+  configureGitUser: mockConfigureGitUser,
+  configureGitAuth: mockConfigureGitAuth,
+  stageAllChanges: mockStageAllChanges,
+  commitChanges: mockCommitChanges,
+  pushToRemote: mockPushToRemote,
+  fetchBranch: mockFetchBranch,
+  checkoutBranch: mockCheckoutBranch,
+  stashChanges: mockStashChanges,
+  stashPop: mockStashPop,
 }));
 
 // Setup default GitHub context
@@ -152,11 +144,21 @@ describe('updatePullRequest - integration tests', () => {
   beforeEach(async () => {
     mockPullsUpdate.mockClear();
     mockPullsGet.mockClear();
-    mockGetTree.mockClear();
-    mockCreateBlob.mockClear();
-    mockCreateTree.mockClear();
-    mockCreateCommit.mockClear();
-    mockUpdateRef.mockClear();
+    mockHasLocalChanges.mockClear();
+    mockGetChangesSummary.mockClear();
+    mockConfigureGitUser.mockClear();
+    mockConfigureGitAuth.mockClear();
+    mockStageAllChanges.mockClear();
+    mockCommitChanges.mockClear();
+    mockPushToRemote.mockClear();
+    mockFetchBranch.mockClear();
+    mockCheckoutBranch.mockClear();
+    mockStashChanges.mockClear();
+    mockStashPop.mockClear();
+
+    // Default: no local changes
+    mockHasLocalChanges.mockReturnValue(false);
+
     // Reset to default context
     mockContext.issue = { number: 42 };
     mockContext.eventName = 'pull_request';
@@ -219,6 +221,48 @@ describe('updatePullRequest - integration tests', () => {
       title: 'New title',
       body: 'New body',
     });
+  });
+
+  test('commits and pushes when local changes exist', async () => {
+    const module = await getModule();
+    const { updatePullRequest } = module;
+
+    mockHasLocalChanges.mockReturnValue(true);
+    mockGetChangesSummary.mockReturnValue({ added: 1, modified: 2, deleted: 0, files: ['a.ts', 'b.ts', 'c.ts'] });
+    mockCommitChanges.mockReturnValue('new-commit-sha');
+
+    const result = await updatePullRequest({
+      message: 'Fix bug',
+    });
+
+    expect(mockConfigureGitUser).toHaveBeenCalled();
+    expect(mockConfigureGitAuth).toHaveBeenCalledWith('fake-token', expect.anything());
+    expect(mockStashChanges).toHaveBeenCalled();
+    expect(mockFetchBranch).toHaveBeenCalledWith('feature-branch', expect.anything());
+    expect(mockCheckoutBranch).toHaveBeenCalledWith('feature-branch', expect.anything());
+    expect(mockStashPop).toHaveBeenCalled();
+    expect(mockStageAllChanges).toHaveBeenCalled();
+    expect(mockCommitChanges).toHaveBeenCalledWith('Fix bug', expect.anything());
+    expect(mockPushToRemote).toHaveBeenCalledWith('feature-branch', false, expect.anything());
+    expect(result.details.commitSha).toBe('new-commit-sha');
+  });
+
+  test('skips commit when no local changes', async () => {
+    const module = await getModule();
+    const { updatePullRequest } = module;
+
+    mockHasLocalChanges.mockReturnValue(false);
+
+    const result = await updatePullRequest({
+      title: 'Metadata only',
+    });
+
+    expect(mockConfigureGitUser).not.toHaveBeenCalled();
+    expect(mockStageAllChanges).not.toHaveBeenCalled();
+    expect(mockCommitChanges).not.toHaveBeenCalled();
+    expect(mockPushToRemote).not.toHaveBeenCalled();
+    expect(result.details.commitSha).toBeUndefined();
+    expect(result.details.titleUpdated).toBe(true);
   });
 
   test('uses provided pull_number parameter', async () => {
@@ -317,5 +361,22 @@ describe('updatePullRequest - integration tests', () => {
     expect(result.details.dryRun).toBe(true);
     expect(mockPullsUpdate).not.toHaveBeenCalled();
     expect(result.content[0].text).toContain('[DRY RUN]');
+  });
+
+  test('dry run reports local changes when present', async () => {
+    const module = await getModule();
+    const { updatePullRequest } = module;
+
+    mockHasLocalChanges.mockReturnValue(true);
+    mockGetChangesSummary.mockReturnValue({ added: 2, modified: 1, deleted: 1, files: [] });
+
+    const result = await updatePullRequest({
+      dryRun: true,
+    });
+
+    expect(result.details.dryRun).toBe(true);
+    expect(result.content[0].text).toContain('2 new file(s)');
+    expect(result.content[0].text).toContain('1 modified file(s)');
+    expect(result.content[0].text).toContain('1 deleted file(s)');
   });
 });
