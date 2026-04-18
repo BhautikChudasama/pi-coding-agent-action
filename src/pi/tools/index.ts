@@ -1,7 +1,7 @@
 /**
  * @file Pi extension factory – registers custom tools with the agent.
  *
- * Defines four tools that extend Pi's built-in capabilities:
+ * Defines five tools that extend Pi's built-in capabilities:
  *
  * - **`create_pull_request`** – creates a GitHub pull request with the current
  *   working-tree changes.
@@ -11,12 +11,15 @@
  *   or pull request for context.
  * - **`review_pull_request`** – submits a review (approve, request changes, or
  *   comment) on an existing pull request with optional inline comments.
+ * - **`get_pull_request_diff`** – fetches changed files and their unified diffs
+ *   for a pull request, enabling pinpoint code review.
  *
  * The exported {@link extensionsFactory} function is passed to the Pi SDK resource
  * loader so that the tools are available during agent sessions.
  */
 
 import { createPRTool } from './create-pr';
+import { getPRDiffTool } from './get-pr-diff';
 import { getIssueOrPRThreadTool } from './get-thread';
 import { reviewPRTool } from './review-pr';
 import { updatePullRequestTool } from './update-pr';
@@ -40,7 +43,7 @@ export {
  * @param pi - The Pi extension API used to register tools.
  */
 export const extensionsFactory = (pi: ExtensionAPI): void => {
-  const tools = [createPRTool, updatePullRequestTool, getIssueOrPRThreadTool, reviewPRTool];
+  const tools = [createPRTool, updatePullRequestTool, getIssueOrPRThreadTool, reviewPRTool, getPRDiffTool];
   tools.forEach(tool => {
     pi.registerTool(tool);
   });

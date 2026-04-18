@@ -15,7 +15,18 @@ export const SYSTEM_PROMPT = [
   '- Only use create_pull_request when there is no existing PR (e.g., you are triggered from an issue).',
   '- Workflow: (1) read/understand the task, (2) make your edits, (3) commit using update_pull_request (if PR exists) or create_pull_request (if no PR exists).',
   '- NEVER finish your session without committing if you have made file changes.',
-  '- Use availabe skills',
+  '',
+  'CRITICAL — Code review workflow:',
+  '- When asked to review a PR, you MUST follow this workflow:',
+  '  1. Use get_pull_request_diff to fetch the changed files and their diffs.',
+  '  2. Analyze every changed file for bugs, security vulnerabilities, performance issues, code quality, and improvements.',
+  '  3. Use review_pull_request with inline comments on specific files and line numbers to leave pinpoint feedback — just like CodeRabbit.',
+  '  4. Each inline comment MUST reference the exact file path and line number from the diff.',
+  '  5. For the review event, use COMMENT for general feedback, REQUEST_CHANGES if there are blocking issues, or APPROVE if the code looks good.',
+  '- NEVER skip the get_pull_request_diff step. You cannot leave accurate inline comments without first reading the diff.',
+  '- For large PRs, use file_filter to review files in batches (e.g., "**.ts" for TypeScript, "src/**" for src directory).',
+  '',
+  'Use available skills',
 ].join('\n');
 
 //
@@ -120,6 +131,7 @@ export const REVIEW_PULL_REQUEST_PROMPT_GUIDELINES = [
   'You can include inline comments on specific files and lines in the PR diff using the comments parameter.',
   'When using REQUEST_CHANGES, always include a body explaining what needs to change.',
   'For inline comments, use the line number as it appears in the diff (not the original file). Use side RIGHT for additions, LEFT for deletions.',
+  'RECOMMENDED WORKFLOW for code review: (1) Use get_pull_request_diff to fetch the changed files and diffs, (2) Analyze the code changes for bugs, security issues, and improvements, (3) Use review_pull_request with inline comments pointing to specific lines where you found issues.',
 ];
 
 export const REVIEW_PULL_REQUEST_DESCRIPTION =
@@ -136,3 +148,29 @@ export const REVIEW_PULL_REQUEST_PARAM_BODY_DESCRIPTION =
 
 export const REVIEW_PULL_REQUEST_PARAM_COMMENTS_DESCRIPTION =
   'Optional array of inline comments on specific files and lines in the PR diff. Each comment needs: path (file path), line (line number in diff), body (comment text), and optionally side (LEFT for deletions, RIGHT for additions).';
+
+//
+// Get Pull Request Diff
+//
+export const GET_PULL_REQUEST_DIFF_PROMPT_SNIPPET =
+  'Fetch the changed files and their diffs for a pull request. Returns file-level patches with line numbers for pinpoint code review.';
+
+export const GET_PULL_REQUEST_DIFF_PROMPT_GUIDELINES = [
+  'Use get_pull_request_diff BEFORE review_pull_request to see exactly what code changed in the PR.',
+  'The diff output includes line numbers in standard unified diff format — use these line numbers when creating inline review comments.',
+  'By default fetches up to 50 files. Use max_files to adjust, or file_filter to focus on specific paths (e.g., "**.ts" for TypeScript files, "src/**" for the src directory).',
+  'By default, the tool works with the current PR from the GitHub context. Only provide pull_number when reviewing a different PR.',
+  'For large PRs, use file_filter to review files in batches by directory or extension to stay within context limits.',
+];
+
+export const GET_PULL_REQUEST_DIFF_DESCRIPTION =
+  'Fetch the changed files and unified diffs for a pull request. Returns each file\'s status (added/modified/deleted/renamed), additions, deletions, and the patch content. Use this to understand what changed before submitting a review with pinpoint inline comments.';
+
+export const GET_PULL_REQUEST_DIFF_PARAM_PULL_NUMBER_DESCRIPTION =
+  'Pull request number. If not provided, uses the current PR from context.';
+
+export const GET_PULL_REQUEST_DIFF_PARAM_MAX_FILES_DESCRIPTION =
+  'Maximum number of files to return. Defaults to 50. Use a lower value for very large PRs to stay within context limits.';
+
+export const GET_PULL_REQUEST_DIFF_PARAM_FILE_FILTER_DESCRIPTION =
+  'Filter files by pattern. Supports: exact path ("src/index.ts"), directory prefix ("src/**"), extension suffix ("**.ts" or "*.ts"). Only matching files will be returned.';

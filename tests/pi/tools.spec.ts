@@ -85,6 +85,7 @@ describe('extFactory', () => {
   let updatePRTool: TestTool;
   let getIssuePRThreadTool: TestTool;
   let reviewPRTool: TestTool;
+  let getPRDiffTool: TestTool;
 
   beforeEach(() => {
     tools = captureRegisteredTools();
@@ -92,10 +93,11 @@ describe('extFactory', () => {
     updatePRTool = getToolByName(tools, 'update_pull_request')!;
     getIssuePRThreadTool = getToolByName(tools, 'get_issue_or_pr_thread')!;
     reviewPRTool = getToolByName(tools, 'review_pull_request')!;
+    getPRDiffTool = getToolByName(tools, 'get_pull_request_diff')!;
   });
 
-  test('registers four tools', () => {
-    expect(tools.length).toBe(4);
+  test('registers five tools', () => {
+    expect(tools.length).toBe(5);
   });
 
   test('registers a tool named create_pull_request', () => {
@@ -192,6 +194,30 @@ describe('extFactory', () => {
   test('review_pull_request has a prompt snippet', () => {
     expect(typeof reviewPRTool.promptSnippet).toBe('string');
     expect(reviewPRTool.promptSnippet.length).toBeGreaterThan(0);
+  });
+
+  test('registers a tool named get_pull_request_diff', () => {
+    expect(getPRDiffTool).toBeDefined();
+    expect(getPRDiffTool.name).toBe('get_pull_request_diff');
+  });
+
+  test('get_pull_request_diff has a non-empty description', () => {
+    expect(typeof getPRDiffTool.description).toBe('string');
+    expect(getPRDiffTool.description.length).toBeGreaterThan(0);
+  });
+
+  test('get_pull_request_diff has a label', () => {
+    expect(getPRDiffTool.label).toBe('Get Pull Request Diff');
+  });
+
+  test('get_pull_request_diff has prompt guidelines', () => {
+    expect(Array.isArray(getPRDiffTool.promptGuidelines)).toBe(true);
+    expect(getPRDiffTool.promptGuidelines.length).toBeGreaterThan(0);
+  });
+
+  test('get_pull_request_diff has a prompt snippet', () => {
+    expect(typeof getPRDiffTool.promptSnippet).toBe('string');
+    expect(getPRDiffTool.promptSnippet.length).toBeGreaterThan(0);
   });
 
   test('create_pull_request parameters require title as string', () => {
@@ -352,6 +378,21 @@ describe('extFactory', () => {
       expect(result.details.reviewId).toBe(0);
       expect(result.details.pullRequestNumber).toBe(0);
       expect(result.details.reviewUrl).toBe('');
+    });
+  });
+
+  describe('get_pull_request_diff execute', () => {
+    test('returns cancellation message when signal is aborted', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await getPRDiffTool.execute('id', {}, controller.signal);
+
+      expect(result.content[0]?.text).toContain('cancelled');
+      expect(result.details.cancelled).toBe(true);
+      expect(result.details.pullRequestNumber).toBe(0);
+      expect(result.details.totalFiles).toBe(0);
+      expect(result.details.files).toEqual([]);
     });
   });
 });

@@ -172,10 +172,18 @@ export {
   type ReviewPullRequestDetails,
 } from './pull-request-review';
 
+// Pull request diff retrieval functions (used by pi/tools/get-pr-diff.ts)
+export {
+  getPullRequestDiff,
+  type GetPullRequestDiffParams,
+  type GetPullRequestDiffDetails,
+} from './pull-request-diff';
+
 // Cancellation messages (used by pi/tools)
 export {
   CANCELLATION_MESSAGE_CREATE_PR,
   CANCELLATION_MESSAGE_GET_THREAD,
   CANCELLATION_MESSAGE_UPDATE_PR,
   CANCELLATION_MESSAGE_REVIEW_PR,
+  CANCELLATION_MESSAGE_GET_PR_DIFF,
 } from './constants';
