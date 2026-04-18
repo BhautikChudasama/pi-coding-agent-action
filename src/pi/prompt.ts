@@ -106,3 +106,33 @@ export const UPDATE_PULL_REQUEST_PARAM_MESSAGE_DESCRIPTION =
 
 export const UPDATE_PULL_REQUEST_PARAM_DRY_RUN_DESCRIPTION =
   'Set to true to simulate the PR update without actually modifying anything (for testing). Set to false to apply the actual changes.';
+
+//
+// Review Pull Request
+//
+export const REVIEW_PULL_REQUEST_PROMPT_SNIPPET =
+  'Submit a review on an existing pull request. Supports APPROVE, REQUEST_CHANGES, and COMMENT events, with optional inline file comments.';
+
+export const REVIEW_PULL_REQUEST_PROMPT_GUIDELINES = [
+  'Use review_pull_request to submit a formal review on a pull request.',
+  'Choose the appropriate event: APPROVE to approve, REQUEST_CHANGES to request changes, or COMMENT for general feedback.',
+  'By default, the tool works with the current PR from the GitHub context. Only provide pull_number when reviewing a different PR.',
+  'You can include inline comments on specific files and lines in the PR diff using the comments parameter.',
+  'When using REQUEST_CHANGES, always include a body explaining what needs to change.',
+  'For inline comments, use the line number as it appears in the diff (not the original file). Use side RIGHT for additions, LEFT for deletions.',
+];
+
+export const REVIEW_PULL_REQUEST_DESCRIPTION =
+  'Submit a review on an existing pull request. Can approve, request changes, or leave a general comment. Optionally attach inline comments to specific files and lines in the PR diff.';
+
+export const REVIEW_PULL_REQUEST_PARAM_PULL_NUMBER_DESCRIPTION =
+  'Pull request number. If not provided, uses the current PR from context.';
+
+export const REVIEW_PULL_REQUEST_PARAM_EVENT_DESCRIPTION =
+  'The review action: APPROVE to approve the PR, REQUEST_CHANGES to request changes, or COMMENT for general feedback without explicit approval or rejection.';
+
+export const REVIEW_PULL_REQUEST_PARAM_BODY_DESCRIPTION =
+  'The review summary/body in markdown. Required when event is REQUEST_CHANGES. Recommended for COMMENT and APPROVE as well.';
+
+export const REVIEW_PULL_REQUEST_PARAM_COMMENTS_DESCRIPTION =
+  'Optional array of inline comments on specific files and lines in the PR diff. Each comment needs: path (file path), line (line number in diff), body (comment text), and optionally side (LEFT for deletions, RIGHT for additions).';

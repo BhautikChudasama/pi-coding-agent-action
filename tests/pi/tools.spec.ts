@@ -84,16 +84,18 @@ describe('extFactory', () => {
   let createPRTool: TestTool;
   let updatePRTool: TestTool;
   let getIssuePRThreadTool: TestTool;
+  let reviewPRTool: TestTool;
 
   beforeEach(() => {
     tools = captureRegisteredTools();
     createPRTool = getToolByName(tools, 'create_pull_request')!;
     updatePRTool = getToolByName(tools, 'update_pull_request')!;
     getIssuePRThreadTool = getToolByName(tools, 'get_issue_or_pr_thread')!;
+    reviewPRTool = getToolByName(tools, 'review_pull_request')!;
   });
 
-  test('registers three tools', () => {
-    expect(tools.length).toBe(3);
+  test('registers four tools', () => {
+    expect(tools.length).toBe(4);
   });
 
   test('registers a tool named create_pull_request', () => {
@@ -166,6 +168,30 @@ describe('extFactory', () => {
   test('update_pull_request has a non-empty description', () => {
     expect(typeof updatePRTool.description).toBe('string');
     expect(updatePRTool.description.length).toBeGreaterThan(0);
+  });
+
+  test('registers a tool named review_pull_request', () => {
+    expect(reviewPRTool).toBeDefined();
+    expect(reviewPRTool.name).toBe('review_pull_request');
+  });
+
+  test('review_pull_request has a non-empty description', () => {
+    expect(typeof reviewPRTool.description).toBe('string');
+    expect(reviewPRTool.description.length).toBeGreaterThan(0);
+  });
+
+  test('review_pull_request has a label', () => {
+    expect(reviewPRTool.label).toBe('Review Pull Request');
+  });
+
+  test('review_pull_request has prompt guidelines', () => {
+    expect(Array.isArray(reviewPRTool.promptGuidelines)).toBe(true);
+    expect(reviewPRTool.promptGuidelines.length).toBeGreaterThan(0);
+  });
+
+  test('review_pull_request has a prompt snippet', () => {
+    expect(typeof reviewPRTool.promptSnippet).toBe('string');
+    expect(reviewPRTool.promptSnippet.length).toBeGreaterThan(0);
   });
 
   test('create_pull_request parameters require title as string', () => {
@@ -307,6 +333,25 @@ describe('extFactory', () => {
       expect(result.details.cancelled).toBe(true);
       expect(result.details.pullRequestNumber).toBe(0);
       expect(result.details.pullRequestUrl).toBe('');
+    });
+  });
+
+  describe('review_pull_request execute', () => {
+    test('returns cancellation message when signal is aborted', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await reviewPRTool.execute(
+        'id',
+        { event: 'COMMENT' },
+        controller.signal
+      );
+
+      expect(result.content[0]?.text).toContain('cancelled');
+      expect(result.details.cancelled).toBe(true);
+      expect(result.details.reviewId).toBe(0);
+      expect(result.details.pullRequestNumber).toBe(0);
+      expect(result.details.reviewUrl).toBe('');
     });
   });
 });

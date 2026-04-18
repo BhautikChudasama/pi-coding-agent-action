@@ -165,9 +165,17 @@ export {
   type UpdatePullRequestDetails,
 } from './pull-request-update';
 
+// Pull request review functions (used by pi/tools/review-pr.ts)
+export {
+  reviewPullRequest,
+  type ReviewPullRequestParams,
+  type ReviewPullRequestDetails,
+} from './pull-request-review';
+
 // Cancellation messages (used by pi/tools)
 export {
   CANCELLATION_MESSAGE_CREATE_PR,
   CANCELLATION_MESSAGE_GET_THREAD,
   CANCELLATION_MESSAGE_UPDATE_PR,
+  CANCELLATION_MESSAGE_REVIEW_PR,
 } from './constants';
